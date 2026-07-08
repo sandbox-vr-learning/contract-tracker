@@ -57,11 +57,17 @@ function relevantDeadline(contract) {
   return d.toISOString().slice(0, 10);
 }
 
-// Multi-year totals get divided by their term so the dashboard shows a true annual figure.
+// Prefers Vendr's own precomputed annualized figure (accounts for exact billing frequency);
+// falls back to the manual value_type classification for contracts not sourced from a Vendr export.
 function annualizedValue(c) {
+  if (c.annualized_value !== null && c.annualized_value !== undefined) return Number(c.annualized_value);
   const v = Number(c.total_value) || 0;
   if (c.value_type === 'multi_year' && c.contract_term_years > 0) return v / c.contract_term_years;
   return v;
+}
+
+function hasKnownAnnualValue(c) {
+  return (c.annualized_value !== null && c.annualized_value !== undefined) || !!c.value_type;
 }
 
 function toast(message, isError = false) {
@@ -77,17 +83,22 @@ function ownersText(owners) {
 }
 
 function valueTypeBadge(c) {
-  if (!c.value_type) return '<span class="badge badge-orange">Needs review</span>';
-  const labels = {
-    annual: 'Annual',
-    multi_year: `Multi-year${c.contract_term_years ? ` (${c.contract_term_years}y)` : ''}`,
-    one_time: 'One-time',
-  };
-  return `<span class="badge badge-blue">${esc(labels[c.value_type] || c.value_type)}</span>`;
+  if (c.value_type) {
+    const labels = {
+      annual: 'Annual',
+      multi_year: `Multi-year${c.contract_term_years ? ` (${c.contract_term_years}y)` : ''}`,
+      one_time: 'One-time',
+    };
+    return `<span class="badge badge-blue">${esc(labels[c.value_type] || c.value_type)}</span>`;
+  }
+  if (c.annualized_value !== null && c.annualized_value !== undefined) {
+    return `<span class="badge badge-blue">${money(c.annualized_value)}/yr</span>`;
+  }
+  return '<span class="badge badge-orange">Needs review</span>';
 }
 
 function statusBadge(status) {
-  const map = { active: 'badge-green', cancelled: 'badge-red', expired: 'badge-grey' };
+  const map = { active: 'badge-green', pending: 'badge-orange', cancelled: 'badge-red', expired: 'badge-grey' };
   return `<span class="badge ${map[status] || 'badge-grey'}">${esc(status || 'active')}</span>`;
 }
 
@@ -97,12 +108,33 @@ function esc(str) {
 }
 
 // Parses "Jane Doe (jane.doe@sandboxvr.com), it (it@sandboxvr.com)" into [{name, email}] — used only by CSV import.
+// Requires "@" inside the captured email group so names with their own parens (e.g. "Kimkind (楊劍界) (kimkind@x.com)")
+// don't get mis-split on the first paren — the name group backtracks past any non-email parenthetical.
 function parseOwnersField(text) {
   if (!text) return [];
-  const matches = [...text.matchAll(/([^,()]+?)\s*[\(<]([^)>]+)[\)>]/g)];
+  const matches = [...text.matchAll(/([^,]+?)\s*[\(<]([^()<>]*@[^()<>]*)[\)>]/g)];
   return matches
     .map((m) => ({ name: m[1].trim(), email: m[2].trim().toLowerCase() }))
     .filter((o) => o.name && o.email);
+}
+
+// Parses "12 months" / "1 month" into 12 / 1
+function parseTermMonths(text) {
+  if (!text) return null;
+  const m = String(text).trim().match(/(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function mapStatus(text) {
+  const s = (text || '').trim().toLowerCase();
+  return ['active', 'pending', 'cancelled', 'expired'].includes(s) ? s : 'active';
+}
+
+function daysBetween(laterDateStr, earlierDateStr) {
+  if (!laterDateStr || !earlierDateStr) return null;
+  const later = new Date(laterDateStr + 'T00:00:00');
+  const earlier = new Date(earlierDateStr + 'T00:00:00');
+  return Math.round((later - earlier) / 86400000);
 }
 
 function parseCurrency(text) {
@@ -295,7 +327,7 @@ function renderDashboard() {
 }
 
 function renderNeedsReview(active) {
-  const rows = active.filter((c) => !c.value_type);
+  const rows = active.filter((c) => !hasKnownAnnualValue(c));
   $('#needs-review-card').classList.toggle('hidden', rows.length === 0);
   $('#needs-review-list').innerHTML = rows.map((c) => `
     <div class="alert-row">
@@ -392,9 +424,11 @@ function computeActionItems() {
     .filter((c) => c.status === 'active')
     .map((c) => {
       const issues = [];
-      if (!c.value_type) issues.push('Unclassified value');
+      if (!hasKnownAnnualValue(c)) issues.push('Unclassified value');
       if (!c.category_id) issues.push('Uncategorized');
       if (c.renewal_deadline && daysUntil(c.renewal_deadline) < 0) issues.push('Past deadline');
+      // Month-to-month subscriptions legitimately have no fixed deadline — only flag this for actual contracts.
+      if (!c.renewal_deadline && c.type === 'Contract') issues.push('Missing deadline');
       return { ...c, issues };
     })
     .filter((c) => c.issues.length > 0)
@@ -654,18 +688,35 @@ async function parseCSVFile() {
   const text = await file.text();
   const raw = parseCSV(text);
 
-  state.importRows = raw.map((r) => ({
-    contract_ref: r['Name']?.trim() || null,
-    supplier: r['Supplier']?.trim() || null,
-    total_value: parseCurrency(r['Total value']),
-    renewal_deadline: parseVendrDate(r['Renewal deadline']),
-    auto_renew: (r['Auto-renew'] || '').trim().toLowerCase() === 'yes',
-    renewal_stage: r['Renewal stage']?.trim() || 'Not started',
-    owners: parseOwnersField(r['Owners']),
-    negotiated_savings: parseCurrency(r['Negotiated savings']),
-    negotiated_savings_pct: r['Negotiated savings %'] ? parseCurrency(r['Negotiated savings %']) : null,
-    status: 'active',
-  })).filter((r) => r.contract_ref);
+  state.importRows = raw.map((r) => {
+    // Vendr's "Renewal deadline" is already notice-adjusted; "End date" (if present) is the true contract end.
+    // Older exports only have "Renewal deadline" with no "End date" — fall back to it directly in that case.
+    const vendrNoticeDeadline = r['Renewal deadline'] ? parseVendrDate(r['Renewal deadline']) : null;
+    const endDate = r['End date'] ? parseVendrDate(r['End date']) : null;
+    const renewalDeadline = endDate || vendrNoticeDeadline;
+    const noticePeriodDays = (endDate && vendrNoticeDeadline) ? daysBetween(endDate, vendrNoticeDeadline) : null;
+
+    return {
+      contract_ref: r['Name']?.trim() || null,
+      supplier: r['Supplier']?.trim() || null,
+      type: r['Type']?.trim() || null,
+      term_months: parseTermMonths(r['Term']),
+      total_value: parseCurrency(r['Total value']),
+      annualized_value: r['Annualized value'] ? parseCurrency(r['Annualized value']) : null,
+      billing_amount: r['Billing amount'] ? parseCurrency(r['Billing amount']) : null,
+      billing_frequency: r['Billing frequency']?.trim() || null,
+      date_signed: r['Date signed'] ? parseVendrDate(r['Date signed']) : null,
+      product: r['Products']?.trim() || null,
+      renewal_deadline: renewalDeadline,
+      notice_period_days: noticePeriodDays,
+      auto_renew: (r['Auto-renew'] || '').trim().toLowerCase() === 'yes',
+      renewal_stage: r['Renewal stage']?.trim() || 'Not started',
+      owners: parseOwnersField(r['Owners']),
+      negotiated_savings: parseCurrency(r['Negotiated savings']),
+      negotiated_savings_pct: r['Negotiated savings %'] ? parseCurrency(r['Negotiated savings %']) : null,
+      status: mapStatus(r['Status']),
+    };
+  }).filter((r) => r.contract_ref);
 
   $('#import-count').textContent = state.importRows.length;
   $('#import-preview-body').innerHTML = state.importRows.slice(0, 50).map((r) => `

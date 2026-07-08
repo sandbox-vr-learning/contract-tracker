@@ -162,6 +162,7 @@
           <select id="filter-status">
             <option value="">All statuses</option>
             <option value="active">Active</option>
+            <option value="pending">Pending</option>
             <option value="cancelled">Cancelled</option>
             <option value="expired">Expired</option>
           </select>
@@ -292,7 +293,7 @@
 
       <div class="card">
         <h2>Import CSV</h2>
-        <p class="muted">Upload the Vendr export. Expected headers: Name, Renewal deadline, Supplier, Total value, Auto-renew, Renewal stage, Owners, Negotiated savings, Negotiated savings %.</p>
+        <p class="muted">Upload a Vendr export. Works with the full "All agreements" export (Name, Supplier, Type, Term, Auto-renew, Total value, Status, Negotiated savings, Negotiated savings %, Annualized value, Billing amount, Billing frequency, Date signed, End date, Owners, Products, Renewal deadline, Renewal stage) or the older Contracts-only export.</p>
         <div class="field">
           <label for="csv-file">CSV file</label>
           <input type="file" id="csv-file" accept=".csv" />
@@ -384,6 +385,7 @@
       <label for="cm-status">Status</label>
       <select id="cm-status">
         <option value="active">Active</option>
+        <option value="pending">Pending</option>
         <option value="cancelled">Cancelled</option>
         <option value="expired">Expired</option>
       </select>

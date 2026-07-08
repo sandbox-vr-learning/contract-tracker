@@ -3,12 +3,42 @@
 
 create extension if not exists pgcrypto;
 
+-- Categories: admin-managed spend categories, editable in-app
+create table public.categories (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  created_at timestamptz not null default now()
+);
+
+insert into public.categories (name) values
+  ('Software & SaaS'),
+  ('Facilities & Real Estate'),
+  ('Marketing & Advertising'),
+  ('Insurance'),
+  ('Payroll & HR'),
+  ('IT & Hardware'),
+  ('Professional Services'),
+  ('Utilities'),
+  ('Other');
+
 -- Contracts
 create table public.contracts (
   id uuid primary key default gen_random_uuid(),
   contract_ref text unique not null,
   supplier text,
+  category_id uuid references public.categories(id) on delete set null,
   total_value numeric,
+  -- Manual classification fallback for contracts not sourced from a Vendr export
+  value_type text check (value_type in ('annual', 'multi_year', 'one_time')),
+  contract_term_years numeric,
+  -- Fields sourced directly from Vendr's "All agreements" export
+  type text check (type in ('Subscription', 'Contract')),
+  term_months integer,
+  annualized_value numeric,
+  billing_amount numeric,
+  billing_frequency text,
+  date_signed date,
+  product text,
   renewal_deadline date,
   auto_renew boolean,
   renewal_stage text default 'Not started',
@@ -17,7 +47,7 @@ create table public.contracts (
   notice_period_days integer,
   notes text,
   status text not null default 'active'
-    check (status in ('active', 'cancelled', 'expired')),
+    check (status in ('active', 'pending', 'cancelled', 'expired')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -92,6 +122,7 @@ $$;
 alter table public.contracts enable row level security;
 alter table public.owners enable row level security;
 alter table public.contract_owners enable row level security;
+alter table public.categories enable row level security;
 alter table public.user_roles enable row level security;
 alter table public.alert_thresholds enable row level security;
 alter table public.alert_log enable row level security;
@@ -101,6 +132,8 @@ create policy "read for known users" on public.contracts
 create policy "read for known users" on public.owners
   for select using (public.current_user_role() is not null);
 create policy "read for known users" on public.contract_owners
+  for select using (public.current_user_role() is not null);
+create policy "read for known users" on public.categories
   for select using (public.current_user_role() is not null);
 create policy "read own row or admin" on public.user_roles
   for select using (email = auth.jwt() ->> 'email' or public.current_user_role() = 'admin');
@@ -126,6 +159,9 @@ create policy "admin updates roles" on public.user_roles
 create policy "admin deletes roles" on public.user_roles
   for delete using (public.current_user_role() = 'admin');
 create policy "admin manages thresholds" on public.alert_thresholds
+  for all using (public.current_user_role() = 'admin')
+  with check (public.current_user_role() = 'admin');
+create policy "admin manages categories" on public.categories
   for all using (public.current_user_role() = 'admin')
   with check (public.current_user_role() = 'admin');
 
