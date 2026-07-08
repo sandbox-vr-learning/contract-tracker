@@ -188,3 +188,51 @@ export async function dbDeleteUserRole(id) {
   const { error } = await supabase.from('user_roles').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ---------- Contract files ----------
+// Files live in the private "contract-files" Storage bucket; access is gated by the same
+// user_roles-based RLS as everything else, so viewing a file requires a signed URL.
+
+export async function dbFetchContractFiles(contractId) {
+  const { data, error } = await supabase
+    .from('contract_files')
+    .select('*')
+    .eq('contract_id', contractId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function dbUploadContractFile(contractId, file) {
+  const path = `${contractId}/${Date.now()}-${file.name}`;
+  const { error: uploadError } = await supabase.storage.from('contract-files').upload(path, file);
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase
+    .from('contract_files')
+    .insert({
+      contract_id: contractId,
+      file_name: file.name,
+      storage_path: path,
+      file_type: file.type || null,
+      file_size: file.size || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function dbDeleteContractFile(fileRecord) {
+  const { error: storageError } = await supabase.storage.from('contract-files').remove([fileRecord.storage_path]);
+  if (storageError) throw storageError;
+
+  const { error } = await supabase.from('contract_files').delete().eq('id', fileRecord.id);
+  if (error) throw error;
+}
+
+export async function dbGetFileSignedUrl(storagePath) {
+  const { data, error } = await supabase.storage.from('contract-files').createSignedUrl(storagePath, 300);
+  if (error) throw error;
+  return data.signedUrl;
+}

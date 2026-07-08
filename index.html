@@ -204,6 +204,35 @@
       </div>
     </div>
 
+    <!-- ---------- Contract detail ---------- -->
+    <div id="view-contract-detail" class="view hidden">
+      <div class="page-header">
+        <div>
+          <a href="#" id="detail-back-link" class="muted" style="text-decoration:none;">&larr; Back to Contracts</a>
+          <h1 id="detail-title" style="margin-top:6px;"></h1>
+          <p id="detail-subtitle"></p>
+        </div>
+        <button class="btn btn-primary hidden" id="detail-edit-btn">Edit</button>
+      </div>
+
+      <div class="card">
+        <h2>Details</h2>
+        <div id="detail-fields" class="detail-grid"></div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:14px;">
+          <h2 style="margin:0;">Files</h2>
+          <div>
+            <input type="file" id="detail-file-input" multiple class="hidden" />
+            <button class="btn btn-secondary hidden" id="detail-upload-btn">+ Add file</button>
+          </div>
+        </div>
+        <div id="detail-files-list"></div>
+        <p class="muted hidden" id="detail-files-empty">No files attached yet.</p>
+      </div>
+    </div>
+
     <!-- ---------- Action Required ---------- -->
     <div id="view-action" class="view hidden">
       <div class="page-header">

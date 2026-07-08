@@ -5,6 +5,7 @@ import {
   dbFetchCategories, dbUpsertCategory, dbDeleteCategory,
   dbFetchAlertThresholds, dbUpsertAlertThreshold, dbDeleteAlertThreshold,
   dbFetchUserRoles, dbUpsertUserRole, dbDeleteUserRole,
+  dbFetchContractFiles, dbUploadContractFile, dbDeleteContractFile, dbGetFileSignedUrl,
 } from './db.js';
 
 const state = {
@@ -21,6 +22,8 @@ const state = {
   modalOwners: [],
   sort: { field: 'renewal_deadline', dir: 'asc' },
   hiddenColumns: new Set(JSON.parse(localStorage.getItem('contractsHiddenColumns') || '[]')),
+  detailContractId: null,
+  detailFiles: [],
 };
 
 // Column index matches th position in the Contracts table (1-based). Ref (1) and Actions (last) are always shown.
@@ -297,6 +300,7 @@ function navigate(view) {
   if (view === 'contracts') renderContracts();
   if (view === 'action') renderActionRequired();
   if (view === 'access') renderAccess();
+  if (view === 'contract-detail') renderContractDetail();
 }
 
 // ---------- Dashboard ----------
@@ -547,7 +551,7 @@ function renderContracts() {
 
   $('#contracts-body').innerHTML = rows.map((c) => `
     <tr>
-      <td>${esc(c.contract_ref)}</td>
+      <td><a href="#" data-view-contract="${c.id}">${esc(c.contract_ref)}</a></td>
       <td>${esc(c.supplier || '—')}</td>
       <td>${esc(c.category_name || '—')}</td>
       <td>${money(c.total_value)}</td>
@@ -571,8 +575,157 @@ function renderContracts() {
 
   $all('[data-edit]').forEach((btn) => btn.onclick = () => openContractModal(btn.dataset.edit));
   $all('[data-delete]').forEach((btn) => btn.onclick = () => deleteContract(btn.dataset.delete));
+  $all('[data-view-contract]').forEach((a) => a.onclick = (e) => {
+    e.preventDefault();
+    openContractDetail(a.dataset.viewContract);
+  });
   renderSortArrows();
   applyColumnVisibility();
+}
+
+// ---------- Contract detail ----------
+
+function fmtBytes(n) {
+  if (!n) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileIcon(fileType) {
+  if (fileType?.includes('pdf')) return '📄';
+  if (fileType?.includes('image')) return '🖼️';
+  if (fileType?.includes('sheet') || fileType?.includes('csv')) return '📊';
+  return '📎';
+}
+
+async function openContractDetail(id) {
+  state.detailContractId = id;
+  navigate('contract-detail');
+}
+
+async function renderContractDetail() {
+  const c = state.contracts.find((x) => x.id === state.detailContractId);
+  if (!c) { navigate('contracts'); return; }
+  const canEdit = state.role === 'admin' || state.role === 'editor';
+
+  $('#detail-title').textContent = `${c.contract_ref} — ${c.supplier || 'Unknown supplier'}`;
+  $('#detail-subtitle').textContent = [c.type, c.category_name, statusStripped(c.status)].filter(Boolean).join(' · ');
+  $('#detail-edit-btn').classList.toggle('hidden', !canEdit);
+  $('#detail-edit-btn').onclick = () => openContractModal(c.id);
+  $('#detail-upload-btn').classList.toggle('hidden', !canEdit);
+
+  const fields = [
+    ['Contract ref', c.contract_ref],
+    ['Supplier', c.supplier || '—'],
+    ['Category', c.category_name || '—'],
+    ['Type', c.type || '—'],
+    ['Status', statusStripped(c.status)],
+    ['Total value', money(c.total_value)],
+    ['Annualized value', c.annualized_value !== null && c.annualized_value !== undefined ? money(c.annualized_value) : '—'],
+    ['Value type', c.value_type || '—'],
+    ['Term', c.term_months ? `${c.term_months} months` : (c.contract_term_years ? `${c.contract_term_years} years` : '—')],
+    ['Billing amount', c.billing_amount !== null && c.billing_amount !== undefined ? money(c.billing_amount) : '—'],
+    ['Billing frequency', c.billing_frequency || '—'],
+    ['Date signed', fmtDate(c.date_signed)],
+    ['Renewal deadline', fmtDate(c.renewal_deadline)],
+    ['Notice period', c.notice_period_days !== null && c.notice_period_days !== undefined ? `${c.notice_period_days} days` : '—'],
+    ['Relevant deadline', fmtDate(relevantDeadline(c))],
+    ['Auto-renew', c.auto_renew ? 'Yes' : 'No'],
+    ['Renewal stage', c.renewal_stage || '—'],
+    ['Owners', ownersText(c.owners)],
+    ['Product', c.product || '—'],
+    ['Negotiated savings', c.negotiated_savings ? `${money(c.negotiated_savings)}${c.negotiated_savings_pct ? ` (${c.negotiated_savings_pct}%)` : ''}` : '—'],
+    ['Notes', c.notes || '—'],
+  ];
+  $('#detail-fields').innerHTML = fields.map(([label, value]) => `
+    <div class="detail-field">
+      <div class="label">${esc(label)}</div>
+      <div class="value">${esc(value)}</div>
+    </div>
+  `).join('');
+
+  await loadDetailFiles();
+}
+
+function statusStripped(status) {
+  return status ? status.charAt(0).toUpperCase() + status.slice(1) : '';
+}
+
+async function loadDetailFiles() {
+  try {
+    state.detailFiles = await dbFetchContractFiles(state.detailContractId);
+  } catch (e) {
+    toast('Failed to load files: ' + e.message, true);
+    state.detailFiles = [];
+  }
+  renderDetailFiles();
+}
+
+function renderDetailFiles() {
+  const canEdit = state.role === 'admin' || state.role === 'editor';
+  $('#detail-files-empty').classList.toggle('hidden', state.detailFiles.length > 0);
+  $('#detail-files-list').innerHTML = state.detailFiles.map((f) => `
+    <div class="file-row">
+      <div class="file-meta">
+        <span class="file-icon">${fileIcon(f.file_type)}</span>
+        <div>
+          <div class="file-name">${esc(f.file_name)}</div>
+          <div class="file-sub">${fmtBytes(f.file_size)} · ${fmtDate(f.created_at?.slice(0, 10))}</div>
+        </div>
+      </div>
+      <div class="flex gap-8">
+        <button class="btn btn-secondary" data-view-file="${f.id}">View</button>
+        ${canEdit ? `<button class="btn btn-danger" data-delete-file="${f.id}">Delete</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  $all('[data-view-file]').forEach((btn) => btn.onclick = () => viewFile(btn.dataset.viewFile));
+  $all('[data-delete-file]').forEach((btn) => btn.onclick = () => deleteFile(btn.dataset.deleteFile));
+}
+
+async function viewFile(fileId) {
+  const f = state.detailFiles.find((x) => x.id === fileId);
+  if (!f) return;
+  try {
+    const url = await dbGetFileSignedUrl(f.storage_path);
+    window.open(url, '_blank');
+  } catch (e) {
+    toast('Failed to open file: ' + e.message, true);
+  }
+}
+
+async function deleteFile(fileId) {
+  const f = state.detailFiles.find((x) => x.id === fileId);
+  if (!f) return;
+  if (!confirm(`Delete ${f.file_name}?`)) return;
+  try {
+    await dbDeleteContractFile(f);
+    await loadDetailFiles();
+    toast('File deleted');
+  } catch (e) {
+    toast('Delete failed: ' + e.message, true);
+  }
+}
+
+async function handleFileUpload() {
+  const input = $('#detail-file-input');
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
+  let ok = 0, failed = 0;
+  for (const file of files) {
+    try {
+      await dbUploadContractFile(state.detailContractId, file);
+      ok++;
+    } catch (e) {
+      failed++;
+      toast(`Failed to upload ${file.name}: ${e.message}`, true);
+    }
+  }
+  input.value = '';
+  await loadDetailFiles();
+  if (ok) toast(`Uploaded ${ok} file(s)${failed ? `, ${failed} failed` : ''}`);
 }
 
 // ---------- Owners picker ----------
@@ -998,6 +1151,10 @@ function bindStaticEvents() {
   $('#access-save-btn').onclick = saveUserRole;
   $('#add-threshold-btn').onclick = addThreshold;
   $('#add-category-btn').onclick = addCategory;
+
+  $('#detail-back-link').onclick = (e) => { e.preventDefault(); navigate('contracts'); };
+  $('#detail-upload-btn').onclick = () => $('#detail-file-input').click();
+  $('#detail-file-input').onchange = handleFileUpload;
 }
 
 init();

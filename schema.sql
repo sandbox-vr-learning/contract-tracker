@@ -167,3 +167,45 @@ create policy "admin manages categories" on public.categories
 
 create policy "no client writes to alert_log" on public.alert_log
   for all using (false) with check (false);
+
+-- Contract files: metadata table; bytes live in the private "contract-files" Storage bucket
+-- (created via Storage API, not SQL — see README).
+create table public.contract_files (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references public.contracts(id) on delete cascade,
+  file_name text not null,
+  storage_path text not null,
+  file_type text,
+  file_size integer,
+  created_at timestamptz not null default now()
+);
+
+alter table public.contract_files enable row level security;
+
+create policy "read for known users" on public.contract_files
+  for select using (public.current_user_role() is not null);
+
+create policy "write for admin/editor" on public.contract_files
+  for all using (public.current_user_role() in ('admin', 'editor'))
+  with check (public.current_user_role() in ('admin', 'editor'));
+
+-- Gates the actual file bytes in Storage to the same roles (the bucket itself is private)
+create policy "read contract files for known users" on storage.objects
+  for select using (
+    bucket_id = 'contract-files' and public.current_user_role() is not null
+  );
+
+create policy "write contract files for admin/editor" on storage.objects
+  for insert with check (
+    bucket_id = 'contract-files' and public.current_user_role() in ('admin', 'editor')
+  );
+
+create policy "update contract files for admin/editor" on storage.objects
+  for update using (
+    bucket_id = 'contract-files' and public.current_user_role() in ('admin', 'editor')
+  );
+
+create policy "delete contract files for admin/editor" on storage.objects
+  for delete using (
+    bucket_id = 'contract-files' and public.current_user_role() in ('admin', 'editor')
+  );
