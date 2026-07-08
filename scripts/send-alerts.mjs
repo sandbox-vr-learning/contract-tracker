@@ -68,7 +68,7 @@ async function sendSlack(text) {
   if (!res.ok) throw new Error(`Slack webhook failed: ${res.status} ${await res.text()}`);
 }
 
-async function sendEmail(contract, message) {
+async function sendEmail(contract, message, recipients) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -77,7 +77,7 @@ async function sendEmail(contract, message) {
     },
     body: JSON.stringify({
       from: ALERT_EMAIL_FROM,
-      to: ALERT_EMAIL_RECIPIENTS,
+      to: recipients,
       subject: `Contract renewal alert: ${contract.contract_ref}`,
       text: message,
     }),
@@ -99,7 +99,7 @@ async function main() {
   if (thresholdsError) throw thresholdsError;
 
   if (!SLACK_WEBHOOK_URL) console.log('SLACK_WEBHOOK_URL not set — skipping Slack alerts.');
-  if (!RESEND_API_KEY || !ALERT_EMAIL_RECIPIENTS.length) console.log('RESEND_API_KEY or ALERT_EMAIL_RECIPIENTS not set — skipping email alerts.');
+  if (!RESEND_API_KEY) console.log('RESEND_API_KEY not set — skipping email alerts.');
 
   let sentCount = 0;
 
@@ -120,8 +120,11 @@ async function main() {
         sentCount++;
       }
 
-      if (RESEND_API_KEY && ALERT_EMAIL_RECIPIENTS.length && !(await hasAlreadySent(contract.id, threshold.days_before, 'email'))) {
-        await sendEmail(contract, message);
+      // Recipients = this contract's actual owners, plus the global fallback/CC list (deduped).
+      const recipients = [...new Set([...owners.map((o) => o.email), ...ALERT_EMAIL_RECIPIENTS])];
+
+      if (RESEND_API_KEY && recipients.length && !(await hasAlreadySent(contract.id, threshold.days_before, 'email'))) {
+        await sendEmail(contract, message, recipients);
         await logAlert(contract.id, threshold.days_before, 'email');
         sentCount++;
       }

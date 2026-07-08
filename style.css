@@ -324,3 +324,120 @@ label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
 
 .login-box .logo { font-weight: 700; font-size: 20px; margin-bottom: 20px; }
 .login-box .logo span { color: var(--trigger-blue); }
+
+/* ---------- Info bubbles ---------- */
+
+.info-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: help;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.info-bubble:hover, .info-bubble:focus {
+  background: var(--trigger-blue);
+  color: var(--white);
+  outline: none;
+}
+
+/* ---------- Owner picker ---------- */
+
+.owner-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.owner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 118, 255, 0.1);
+  color: var(--trigger-blue-dark);
+  border-radius: 20px;
+  padding: 4px 6px 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.owner-chip button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+
+.owner-suggestions {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-top: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+
+.owner-suggestion {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.owner-suggestion:hover { background: var(--crystal-grey); }
+.owner-suggestion .email { color: var(--text-secondary); font-size: 12px; }
+.owner-suggestion.create-new { color: var(--trigger-blue); font-weight: 600; }
+
+/* ---------- Sortable table headers ---------- */
+
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--holodeck-black); }
+th.sortable .sort-arrow { margin-left: 4px; color: var(--trigger-blue); }
+
+/* ---------- Simple bar charts (no library) ---------- */
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.bar-row .bar-track {
+  background: var(--crystal-grey);
+  border-radius: 4px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.bar-row .bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--trigger-blue);
+}
+
+.bar-row .bar-value { text-align: right; color: var(--text-secondary); white-space: nowrap; }
+
+.alert-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.alert-row:last-child { border-bottom: none; }

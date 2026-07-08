@@ -37,22 +37,23 @@ export async function dbGetCurrentUserRole(email) {
 
 // ---------- Contracts ----------
 
-// Returns contracts with owners nested as [{ id, name, email }]
+// Returns contracts with owners nested as [{ id, name, email }] and category_name flattened
 export async function dbFetchContracts() {
   const { data, error } = await supabase
     .from('contracts')
     .select(`
       *,
-      contract_owners (
-        owners ( id, name, email )
-      )
+      contract_owners ( owners ( id, name, email ) ),
+      categories ( id, name )
     `)
     .order('renewal_deadline', { ascending: true });
   if (error) throw error;
   return data.map((row) => ({
     ...row,
     owners: (row.contract_owners ?? []).map((co) => co.owners).filter(Boolean),
+    category_name: row.categories?.name ?? null,
     contract_owners: undefined,
+    categories: undefined,
   }));
 }
 
@@ -114,6 +115,29 @@ export async function dbSetContractOwners(contractId, ownerIds) {
   const rows = ownerIds.map((ownerId) => ({ contract_id: contractId, owner_id: ownerId }));
   const { error: insertError } = await supabase.from('contract_owners').insert(rows);
   if (insertError) throw insertError;
+}
+
+// ---------- Categories ----------
+
+export async function dbFetchCategories() {
+  const { data, error } = await supabase.from('categories').select('*').order('name');
+  if (error) throw error;
+  return data;
+}
+
+export async function dbUpsertCategory(category) {
+  const { data, error } = await supabase
+    .from('categories')
+    .upsert(category)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function dbDeleteCategory(id) {
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ---------- Alert thresholds ----------

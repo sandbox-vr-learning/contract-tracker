@@ -36,8 +36,7 @@
     <div class="sidebar-logo">Sandbox<span>VR</span><br/>Contract Tracker</div>
     <a class="nav-item" data-view="dashboard">Dashboard</a>
     <a class="nav-item" data-view="contracts">Contracts</a>
-    <a class="nav-item" data-view="import">Import CSV</a>
-    <a class="nav-item hidden" id="nav-access" data-view="access">Access Control</a>
+    <a class="nav-item hidden" id="nav-access" data-view="access">Admin</a>
     <div class="sidebar-footer">
       <div id="current-user-email"></div>
       <button id="signout-btn">Sign out</button>
@@ -73,11 +72,38 @@
           <div class="label">Renewing in 90 days</div>
           <div class="value" id="stat-90">0</div>
         </div>
+        <div class="stat-card">
+          <div class="label">Negotiated savings to date</div>
+          <div class="value accent" id="stat-savings">$0</div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="needs-review-card">
+        <h2>Needs review — value type unclassified</h2>
+        <p class="muted">These contracts don't have a value type set (Annual / Multi-year / One-time), so the totals above treat their full value as annual. Ask finance to classify them for an accurate number.</p>
+        <div id="needs-review-list"></div>
+      </div>
+
+      <div class="card hidden" id="auto-renew-card">
+        <h2>⚠ Auto-renew — action needed</h2>
+        <p class="muted">These contracts will silently renew into another term unless someone acts before the deadline.</p>
+        <div id="auto-renew-list"></div>
       </div>
 
       <div class="card">
         <h2>Biggest upcoming renewals</h2>
         <div id="biggest-renewals"></div>
+      </div>
+
+      <div class="stat-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="card">
+          <h2>Spend by category</h2>
+          <div id="category-chart"></div>
+        </div>
+        <div class="card">
+          <h2>Renewal stage breakdown</h2>
+          <div id="stage-breakdown"></div>
+        </div>
       </div>
 
       <div class="card">
@@ -116,23 +142,35 @@
         </div>
         <div class="flex gap-8">
           <input type="text" id="contracts-search" placeholder="Search supplier or ref…" />
+          <select id="filter-status">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="expired">Expired</option>
+          </select>
+          <select id="filter-category">
+            <option value="">All categories</option>
+          </select>
           <button class="btn btn-primary" id="add-contract-btn">+ Add contract</button>
         </div>
       </div>
 
       <div class="card">
+        <div style="overflow-x:auto;">
         <table>
           <thead>
             <tr>
-              <th>Ref</th>
-              <th>Supplier</th>
-              <th>Total value</th>
-              <th>Renewal deadline</th>
+              <th data-sort="contract_ref" class="sortable">Ref</th>
+              <th data-sort="supplier" class="sortable">Supplier</th>
+              <th data-sort="category_name" class="sortable">Category</th>
+              <th data-sort="total_value" class="sortable">Total value</th>
+              <th data-sort="renewal_deadline" class="sortable">Renewal deadline</th>
               <th>Notice (days)</th>
               <th>Auto-renew</th>
-              <th>Stage</th>
-              <th>Status</th>
+              <th data-sort="renewal_stage" class="sortable">Stage</th>
+              <th data-sort="status" class="sortable">Status</th>
               <th>Owners</th>
+              <th>Value type</th>
               <th>Savings</th>
               <th>Notes</th>
               <th></th>
@@ -140,49 +178,16 @@
           </thead>
           <tbody id="contracts-body"></tbody>
         </table>
+        </div>
       </div>
     </div>
 
-    <!-- ---------- Import ---------- -->
-    <div id="view-import" class="view hidden">
-      <div class="page-header">
-        <div>
-          <h1>Import CSV</h1>
-          <p>Upload the Vendr export. Expected headers: Name, Renewal deadline, Supplier, Total value, Auto-renew, Renewal stage, Owners, Negotiated savings, Negotiated savings %.</p>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="field">
-          <label for="csv-file">CSV file</label>
-          <input type="file" id="csv-file" accept=".csv" />
-        </div>
-        <button class="btn btn-primary" id="parse-csv-btn" disabled>Parse file</button>
-        <p class="muted" id="import-status"></p>
-      </div>
-
-      <div class="card hidden" id="import-preview-card">
-        <h2>Preview (<span id="import-count">0</span> rows)</h2>
-        <div style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr>
-                <th>Ref</th><th>Supplier</th><th>Value</th><th>Deadline</th><th>Auto-renew</th><th>Stage</th><th>Owners</th>
-              </tr>
-            </thead>
-            <tbody id="import-preview-body"></tbody>
-          </table>
-        </div>
-        <button class="btn btn-primary" id="confirm-import-btn" style="margin-top:16px;">Import these contracts</button>
-      </div>
-    </div>
-
-    <!-- ---------- Access Control ---------- -->
+    <!-- ---------- Admin ---------- -->
     <div id="view-access" class="view hidden">
       <div class="page-header">
         <div>
-          <h1>Access Control</h1>
-          <p>Manage who can view or edit contracts. Admin only.</p>
+          <h1>Admin</h1>
+          <p>Access, alert timing, categories, and data import. Admin only.</p>
         </div>
       </div>
 
@@ -225,6 +230,45 @@
           <button class="btn btn-secondary" id="add-threshold-btn">+ Add threshold</button>
         </div>
       </div>
+
+      <div class="card">
+        <h2>Categories</h2>
+        <p class="muted">Used to group contracts by type of spend for the dashboard chart and contracts filter.</p>
+        <table>
+          <thead><tr><th>Name</th><th></th></tr></thead>
+          <tbody id="categories-body"></tbody>
+        </table>
+        <div class="flex gap-8" style="margin-top:12px;">
+          <input type="text" id="new-category-name" placeholder="e.g. Legal" style="width:220px;" />
+          <button class="btn btn-secondary" id="add-category-btn">+ Add category</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Import CSV</h2>
+        <p class="muted">Upload the Vendr export. Expected headers: Name, Renewal deadline, Supplier, Total value, Auto-renew, Renewal stage, Owners, Negotiated savings, Negotiated savings %.</p>
+        <div class="field">
+          <label for="csv-file">CSV file</label>
+          <input type="file" id="csv-file" accept=".csv" />
+        </div>
+        <button class="btn btn-primary" id="parse-csv-btn" disabled>Parse file</button>
+        <p class="muted" id="import-status"></p>
+
+        <div class="hidden" id="import-preview-card" style="margin-top:16px;">
+          <h2>Preview (<span id="import-count">0</span> rows)</h2>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ref</th><th>Supplier</th><th>Value</th><th>Deadline</th><th>Auto-renew</th><th>Stage</th><th>Owners</th>
+                </tr>
+              </thead>
+              <tbody id="import-preview-body"></tbody>
+            </table>
+          </div>
+          <button class="btn btn-primary" id="confirm-import-btn" style="margin-top:16px;">Import these contracts</button>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -235,7 +279,10 @@
   <div class="modal">
     <h2 id="contract-modal-title">Add contract</h2>
     <div class="field">
-      <label for="cm-ref">Contract ref</label>
+      <label for="cm-ref">
+        Contract ref
+        <span class="info-bubble" tabindex="0" id="cm-ref-info" title="Auto-suggested as the next number after your highest existing contract ref (e.g. highest is C-041, so this suggests C-042). It's just a label — overwrite it if you want something else.">ⓘ</span>
+      </label>
       <input type="text" id="cm-ref" placeholder="C-000" />
     </div>
     <div class="field">
@@ -243,8 +290,30 @@
       <input type="text" id="cm-supplier" />
     </div>
     <div class="field">
+      <label for="cm-category">Category</label>
+      <select id="cm-category">
+        <option value="">Uncategorized</option>
+      </select>
+    </div>
+    <div class="field">
       <label for="cm-value">Total value ($)</label>
       <input type="number" id="cm-value" />
+    </div>
+    <div class="field">
+      <label for="cm-value-type">
+        Value type
+        <span class="info-bubble" tabindex="0" title="Is the amount above an annual figure, a one-time cost, or the total across a multi-year term? This affects the dashboard's annualized total. Leave as Unclassified to flag it for finance to review.">ⓘ</span>
+      </label>
+      <select id="cm-value-type">
+        <option value="">Unclassified — needs review</option>
+        <option value="annual">Annual</option>
+        <option value="multi_year">Multi-year total</option>
+        <option value="one_time">One-time</option>
+      </select>
+    </div>
+    <div class="field hidden" id="cm-term-years-field">
+      <label for="cm-term-years">Contract term (years)</label>
+      <input type="number" id="cm-term-years" step="0.5" placeholder="e.g. 3" />
     </div>
     <div class="field">
       <label for="cm-deadline">Renewal deadline</label>
@@ -274,8 +343,10 @@
       </select>
     </div>
     <div class="field">
-      <label for="cm-owners">Owners (Name &lt;email@sandboxvr.com&gt;, comma-separated)</label>
-      <textarea id="cm-owners" rows="2" placeholder="Jane Doe <jane.doe@sandboxvr.com>, it <it@sandboxvr.com>"></textarea>
+      <label for="cm-owner-search">Owners</label>
+      <div id="cm-owner-chips" class="owner-chips"></div>
+      <input type="text" id="cm-owner-search" placeholder="Type a name or email to add an owner…" autocomplete="off" />
+      <div id="cm-owner-suggestions" class="owner-suggestions hidden"></div>
     </div>
     <div class="field">
       <label for="cm-savings">Negotiated savings ($)</label>

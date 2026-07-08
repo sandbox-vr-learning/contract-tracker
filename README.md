@@ -25,7 +25,9 @@ Access is controlled via the `user_roles` table in Supabase (managed in-app unde
 Push to `main` → GitHub Pages auto-deploys in 1–3 minutes.
 
 ## Renewal alerts
-`.github/workflows/alerts.yml` runs `scripts/send-alerts.mjs` daily (14:00 UTC, also triggerable manually via **Actions → Contract renewal alerts → Run workflow**). It checks every active contract against the enabled rows in `alert_thresholds` (edit these in-app under **Access Control**) and posts to Slack + sends email once per contract/threshold/channel, logged in `alert_log` to avoid duplicates.
+`.github/workflows/alerts.yml` runs `scripts/send-alerts.mjs` daily (14:00 UTC, also triggerable manually via **Actions → Contract renewal alerts → Run workflow**). It checks every active contract against the enabled rows in `alert_thresholds` (edit these in-app under **Admin**) and posts to Slack + sends email once per contract/threshold/channel, logged in `alert_log` to avoid duplicates.
+
+Email recipients per contract = that contract's actual owners (from the Owners picker in the contract editor) **plus** the global `ALERT_EMAIL_RECIPIENTS` list, if set — deduped. A contract with no owners assigned falls back to the global list only.
 
 Required repo secrets (**Settings → Secrets and variables → Actions**):
 | Secret | Required | Purpose |
@@ -34,7 +36,7 @@ Required repo secrets (**Settings → Secrets and variables → Actions**):
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | From Supabase Settings → API → service_role. Bypasses RLS — never expose client-side. |
 | `SLACK_WEBHOOK_URL` | For Slack alerts | Incoming webhook URL for the target channel |
 | `RESEND_API_KEY` | For email alerts | [Resend](https://resend.com) API key |
-| `ALERT_EMAIL_RECIPIENTS` | For email alerts | Comma-separated list |
+| `ALERT_EMAIL_RECIPIENTS` | Optional | Comma-separated list, CC'd/added to every contract's owners |
 | `ALERT_EMAIL_FROM` | Optional | Defaults to `Contract Tracker <alerts@sandboxvr.com>` |
 
 Missing Slack or email secrets are skipped gracefully (logged, not an error) so the workflow runs fine with only one channel configured.
