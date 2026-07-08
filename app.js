@@ -34,12 +34,11 @@ const COLUMN_DEFS = [
   { key: 'deadline', label: 'Renewal deadline', index: 5 },
   { key: 'notice', label: 'Notice (days)', index: 6 },
   { key: 'autorenew', label: 'Auto-renew', index: 7 },
-  { key: 'stage', label: 'Stage', index: 8 },
-  { key: 'status', label: 'Status', index: 9 },
-  { key: 'owners', label: 'Owners', index: 10 },
-  { key: 'valuetype', label: 'Value type', index: 11 },
-  { key: 'savings', label: 'Savings', index: 12 },
-  { key: 'notes', label: 'Notes', index: 13 },
+  { key: 'status', label: 'Status', index: 8 },
+  { key: 'owners', label: 'Owners', index: 9 },
+  { key: 'valuetype', label: 'Value type', index: 10 },
+  { key: 'savings', label: 'Savings', index: 11 },
+  { key: 'notes', label: 'Notes', index: 12 },
 ];
 
 const MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
@@ -314,9 +313,12 @@ function navigate(view) {
 function renderDashboard() {
   const active = state.contracts.filter(isActive);
   const totalValue = active.reduce((sum, c) => sum + annualizedValue(c), 0);
+  // Matches Vendr's own "Total contracted spend": raw total_value as-is, not divided down to an annual rate.
+  const totalContractedSpend = active.reduce((sum, c) => sum + (Number(c.total_value) || 0), 0);
   const totalSavings = state.contracts.reduce((sum, c) => sum + (Number(c.negotiated_savings) || 0), 0);
 
   $('#stat-total-value').textContent = money(totalValue);
+  $('#stat-contracted-spend').textContent = money(totalContractedSpend);
   $('#stat-active-count').textContent = active.length;
   $('#stat-savings').textContent = money(totalSavings);
 
@@ -346,7 +348,6 @@ function renderDashboard() {
   renderNeedsReview(active);
   renderAutoRenewRisk(withDeadline);
   renderPastDeadline(active);
-  renderStageBreakdown(active);
   renderCategoryChart(active);
   renderUpcomingRenewals(withDeadline);
   $('#renewal-window').onchange = () => renderUpcomingRenewals(withDeadline);
@@ -386,25 +387,6 @@ function renderPastDeadline(active) {
     </div>
   `).join('');
   $all('[data-classify]').forEach((btn) => btn.onclick = () => openContractModal(btn.dataset.classify));
-}
-
-function renderStageBreakdown(active) {
-  const counts = {};
-  active.forEach((c) => {
-    const stage = c.renewal_stage || 'Not started';
-    counts[stage] = (counts[stage] || 0) + 1;
-  });
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const max = Math.max(...entries.map((e) => e[1]), 1);
-  $('#stage-breakdown').innerHTML = entries.length
-    ? entries.map(([stage, count]) => `
-        <div class="bar-row">
-          <div>${esc(stage)}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${(count / max * 100).toFixed(0)}%"></div></div>
-          <div class="bar-value">${count}</div>
-        </div>
-      `).join('')
-    : '<p class="muted">No active contracts yet.</p>';
 }
 
 function renderCategoryChart(active) {
@@ -565,7 +547,6 @@ function renderContracts() {
       <td>${fmtDate(c.renewal_deadline)}</td>
       <td>${c.notice_period_days ?? '—'}</td>
       <td>${c.auto_renew ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-grey">No</span>'}</td>
-      <td>${esc(c.renewal_stage || '—')}</td>
       <td>${statusBadge(c.status)}</td>
       <td>${esc(ownersText(c.owners))}</td>
       <td>${valueTypeBadge(c)}</td>
@@ -639,7 +620,6 @@ async function renderContractDetail() {
     ['Notice period', c.notice_period_days !== null && c.notice_period_days !== undefined ? `${c.notice_period_days} days` : '—'],
     ['Relevant deadline', fmtDate(relevantDeadline(c))],
     ['Auto-renew', c.auto_renew ? 'Yes' : 'No'],
-    ['Renewal stage', c.renewal_stage || '—'],
     ['Owners', ownersText(c.owners)],
     ['Product', c.product || '—'],
     ['Negotiated savings', c.negotiated_savings ? `${money(c.negotiated_savings)}${c.negotiated_savings_pct ? ` (${c.negotiated_savings_pct}%)` : ''}` : '—'],
@@ -824,7 +804,6 @@ function openContractModal(id) {
   $('#cm-deadline').value = c?.renewal_deadline || '';
   $('#cm-notice').value = c?.notice_period_days ?? '';
   $('#cm-autorenew').value = String(c?.auto_renew ?? false);
-  $('#cm-stage').value = c?.renewal_stage || 'Not started';
   $('#cm-status').value = c?.status || 'active';
   $('#cm-savings').value = c?.negotiated_savings ?? '';
   $('#cm-savings-pct').value = c?.negotiated_savings_pct ?? '';
@@ -859,7 +838,6 @@ async function saveContractFromModal() {
     renewal_deadline: $('#cm-deadline').value || null,
     notice_period_days: $('#cm-notice').value ? Number($('#cm-notice').value) : null,
     auto_renew: $('#cm-autorenew').value === 'true',
-    renewal_stage: $('#cm-stage').value.trim() || 'Not started',
     status: $('#cm-status').value,
     negotiated_savings: $('#cm-savings').value ? Number($('#cm-savings').value) : null,
     negotiated_savings_pct: $('#cm-savings-pct').value ? Number($('#cm-savings-pct').value) : null,
@@ -928,7 +906,6 @@ async function parseCSVFile() {
       renewal_deadline: renewalDeadline,
       notice_period_days: noticePeriodDays,
       auto_renew: (r['Auto-renew'] || '').trim().toLowerCase() === 'yes',
-      renewal_stage: r['Renewal stage']?.trim() || 'Not started',
       owners: parseOwnersField(r['Owners']),
       negotiated_savings: parseCurrency(r['Negotiated savings']),
       negotiated_savings_pct: r['Negotiated savings %'] ? parseCurrency(r['Negotiated savings %']) : null,
@@ -944,7 +921,6 @@ async function parseCSVFile() {
       <td>${money(r.total_value)}</td>
       <td>${fmtDate(r.renewal_deadline)}</td>
       <td>${r.auto_renew ? 'Yes' : 'No'}</td>
-      <td>${esc(r.renewal_stage)}</td>
       <td>${esc(r.owners.map((o) => o.name).join(', '))}</td>
     </tr>
   `).join('');
@@ -979,12 +955,12 @@ async function confirmImport() {
 // ---------- CSV Export ----------
 
 function exportCSV() {
-  const headers = ['Name','Supplier','Category','Total value','Value type','Contract term (years)','Renewal deadline','Notice period (days)','Auto-renew','Renewal stage','Status','Owners','Negotiated savings','Negotiated savings %','Notes'];
+  const headers = ['Name','Supplier','Category','Total value','Value type','Contract term (years)','Renewal deadline','Notice period (days)','Auto-renew','Status','Owners','Negotiated savings','Negotiated savings %','Notes'];
   const lines = [headers.join(',')];
   for (const c of state.contracts) {
     const row = [
       c.contract_ref, c.supplier, c.category_name ?? '', c.total_value ?? '', c.value_type ?? '', c.contract_term_years ?? '',
-      c.renewal_deadline ?? '', c.notice_period_days ?? '', c.auto_renew ? 'Yes' : 'No', c.renewal_stage,
+      c.renewal_deadline ?? '', c.notice_period_days ?? '', c.auto_renew ? 'Yes' : 'No',
       c.status, ownersText(c.owners), c.negotiated_savings ?? '', c.negotiated_savings_pct ?? '', c.notes ?? '',
     ].map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`);
     lines.push(row.join(','));

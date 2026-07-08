@@ -249,7 +249,6 @@ tr:hover td { background: var(--crystal-grey); }
 #contracts-table.hide-col-10 th:nth-child(10), #contracts-table.hide-col-10 td:nth-child(10) { display: none; }
 #contracts-table.hide-col-11 th:nth-child(11), #contracts-table.hide-col-11 td:nth-child(11) { display: none; }
 #contracts-table.hide-col-12 th:nth-child(12), #contracts-table.hide-col-12 td:nth-child(12) { display: none; }
-#contracts-table.hide-col-13 th:nth-child(13), #contracts-table.hide-col-13 td:nth-child(13) { display: none; }
 
 td[contenteditable="true"] {
   cursor: text;

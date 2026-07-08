@@ -58,8 +58,18 @@
 
       <div class="stat-grid">
         <div class="stat-card">
-          <div class="label">Total annualized value</div>
+          <div class="label">
+            Total annualized value
+            <span class="info-bubble" tabindex="0" title="What you'll actually spend this year: multi-year/multi-month contracts are divided down to a per-year figure. Includes contracts with a pending renewal decision.">ⓘ</span>
+          </div>
           <div class="value accent" id="stat-total-value">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">
+            Total contracted spend
+            <span class="info-bubble" tabindex="0" title="Matches Vendr's own 'Total contracted spend' figure: the full dollar value of every active contract as-is, without dividing multi-year deals down to an annual rate.">ⓘ</span>
+          </div>
+          <div class="value" id="stat-contracted-spend">$0</div>
         </div>
         <div class="stat-card">
           <div class="label">Active contracts</div>
@@ -112,15 +122,9 @@
         </table>
       </div>
 
-      <div class="stat-grid" style="grid-template-columns: 1fr 1fr;">
-        <div class="card">
-          <h2>Spend by category</h2>
-          <div id="category-chart"></div>
-        </div>
-        <div class="card">
-          <h2>Renewal stage breakdown</h2>
-          <div id="stage-breakdown"></div>
-        </div>
+      <div class="card">
+        <h2>Spend by category</h2>
+        <div id="category-chart"></div>
       </div>
 
       <div class="card">
@@ -190,7 +194,6 @@
               <th data-sort="renewal_deadline" class="sortable">Renewal deadline</th>
               <th data-sort="notice_period_days" class="sortable">Notice (days)</th>
               <th data-sort="auto_renew" class="sortable">Auto-renew</th>
-              <th data-sort="renewal_stage" class="sortable">Stage</th>
               <th data-sort="status" class="sortable">Status</th>
               <th>Owners</th>
               <th data-sort="annualized_value" class="sortable">Value type</th>
@@ -327,7 +330,7 @@
 
       <div class="card">
         <h2>Import CSV</h2>
-        <p class="muted">Upload a Vendr export. Works with the full "All agreements" export (Name, Supplier, Type, Term, Auto-renew, Total value, Status, Negotiated savings, Negotiated savings %, Annualized value, Billing amount, Billing frequency, Date signed, End date, Owners, Products, Renewal deadline, Renewal stage) or the older Contracts-only export.</p>
+        <p class="muted">Upload a Vendr export. Works with the full "All agreements" export (Name, Supplier, Type, Term, Auto-renew, Total value, Status, Negotiated savings, Negotiated savings %, Annualized value, Billing amount, Billing frequency, Date signed, End date, Owners, Products, Renewal deadline) or the older Contracts-only export.</p>
         <div class="field">
           <label for="csv-file">CSV file</label>
           <input type="file" id="csv-file" accept=".csv" />
@@ -341,7 +344,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>Ref</th><th>Supplier</th><th>Value</th><th>Deadline</th><th>Auto-renew</th><th>Stage</th><th>Owners</th>
+                  <th>Ref</th><th>Supplier</th><th>Value</th><th>Deadline</th><th>Auto-renew</th><th>Owners</th>
                 </tr>
               </thead>
               <tbody id="import-preview-body"></tbody>
@@ -410,10 +413,6 @@
         <option value="true">Yes</option>
         <option value="false">No</option>
       </select>
-    </div>
-    <div class="field">
-      <label for="cm-stage">Renewal stage</label>
-      <input type="text" id="cm-stage" value="Not started" />
     </div>
     <div class="field">
       <label for="cm-status">Status</label>
