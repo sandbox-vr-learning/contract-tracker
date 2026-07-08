@@ -1,0 +1,11 @@
+{
+  "name": "contract-tracker-alerts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "send-alerts": "node scripts/send-alerts.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
