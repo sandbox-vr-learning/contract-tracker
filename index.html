@@ -36,6 +36,7 @@
     <div class="sidebar-logo">Sandbox<span>VR</span><br/>Contract Tracker</div>
     <a class="nav-item" data-view="dashboard">Dashboard</a>
     <a class="nav-item" data-view="contracts">Contracts</a>
+    <a class="nav-item" data-view="action">Action Required <span id="nav-action-count" class="nav-badge hidden">0</span></a>
     <a class="nav-item hidden" id="nav-access" data-view="access">Admin</a>
     <div class="sidebar-footer">
       <div id="current-user-email"></div>
@@ -90,9 +91,25 @@
         <div id="auto-renew-list"></div>
       </div>
 
+      <div class="card hidden" id="past-deadline-card">
+        <h2>⚠ Past deadline — still marked active</h2>
+        <p class="muted">These contracts' renewal deadlines have already passed but they're still marked active. Confirm whether they renewed and update the date, or mark them cancelled/expired.</p>
+        <div id="past-deadline-list"></div>
+      </div>
+
       <div class="card">
         <h2>Biggest upcoming renewals</h2>
-        <div id="biggest-renewals"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Ref</th>
+              <th>Supplier</th>
+              <th>Value</th>
+              <th>Deadline</th>
+            </tr>
+          </thead>
+          <tbody id="biggest-renewals"></tbody>
+        </table>
       </div>
 
       <div class="stat-grid" style="grid-template-columns: 1fr 1fr;">
@@ -179,6 +196,35 @@
           <tbody id="contracts-body"></tbody>
         </table>
         </div>
+      </div>
+    </div>
+
+    <!-- ---------- Action Required ---------- -->
+    <div id="view-action" class="view hidden">
+      <div class="page-header">
+        <div>
+          <h1>Action Required</h1>
+          <p>Every active contract with missing or stale data, in one place.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Ref</th>
+              <th>Supplier</th>
+              <th>Value</th>
+              <th>Deadline</th>
+              <th>Issues</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="action-required-body"></tbody>
+        </table>
+        </div>
+        <p class="muted hidden" id="action-required-empty">Nothing needs attention right now.</p>
       </div>
     </div>
 

@@ -216,6 +216,7 @@ async function loadAllData() {
     state.thresholds = await dbFetchAlertThresholds();
     populateCategoryDropdowns();
     if (state.role === 'admin') state.userRoles = await dbFetchUserRoles();
+    updateActionBadge();
   } catch (e) {
     toast('Failed to load data: ' + e.message, true);
   }
@@ -245,6 +246,7 @@ function navigate(view) {
 
   if (view === 'dashboard') renderDashboard();
   if (view === 'contracts') renderContracts();
+  if (view === 'action') renderActionRequired();
   if (view === 'access') renderAccess();
 }
 
@@ -270,25 +272,26 @@ function renderDashboard() {
   const biggest = [...active]
     .filter((c) => c.total_value)
     .sort((a, b) => b.total_value - a.total_value)
-    .slice(0, 4);
+    .slice(0, 5);
   $('#biggest-renewals').innerHTML = biggest.length
     ? biggest.map((c) => `
-        <div class="flex-between" style="padding:8px 0; border-bottom:1px solid var(--border);">
-          <div>
-            <strong>${esc(c.supplier || c.contract_ref)}</strong>
-            <div class="muted">${esc(c.contract_ref)} · ${fmtDate(relevantDeadline(c))}</div>
-          </div>
-          <div class="badge badge-blue">${money(c.total_value)}</div>
-        </div>
+        <tr>
+          <td>${esc(c.contract_ref)}</td>
+          <td>${esc(c.supplier || '—')}</td>
+          <td><span class="badge badge-blue">${money(c.total_value)}</span></td>
+          <td>${fmtDate(relevantDeadline(c))}</td>
+        </tr>
       `).join('')
-    : '<p class="muted">No active contracts yet.</p>';
+    : '<tr><td colspan="4" class="muted">No active contracts yet.</td></tr>';
 
   renderNeedsReview(active);
   renderAutoRenewRisk(withDeadline);
+  renderPastDeadline(active);
   renderStageBreakdown(active);
   renderCategoryChart(active);
   renderUpcomingRenewals(withDeadline);
   $('#renewal-window').onchange = () => renderUpcomingRenewals(withDeadline);
+  updateActionBadge();
 }
 
 function renderNeedsReview(active) {
@@ -312,6 +315,18 @@ function renderAutoRenewRisk(withDeadline) {
       <span class="badge badge-orange">${money(c.total_value)}</span>
     </div>
   `).join('');
+}
+
+function renderPastDeadline(active) {
+  const rows = active.filter((c) => c.renewal_deadline && daysUntil(c.renewal_deadline) < 0);
+  $('#past-deadline-card').classList.toggle('hidden', rows.length === 0);
+  $('#past-deadline-list').innerHTML = rows.map((c) => `
+    <div class="alert-row">
+      <div><strong>${esc(c.contract_ref)}</strong> — ${esc(c.supplier || 'Unknown supplier')} was due ${fmtDate(c.renewal_deadline)} (${Math.abs(daysUntil(c.renewal_deadline))}d ago)</div>
+      <button class="btn btn-secondary" data-classify="${c.id}">Review</button>
+    </div>
+  `).join('');
+  $all('[data-classify]').forEach((btn) => btn.onclick = () => openContractModal(btn.dataset.classify));
 }
 
 function renderStageBreakdown(active) {
@@ -368,6 +383,46 @@ function renderUpcomingRenewals(withDeadline) {
       </tr>
     `;
   }).join('');
+}
+
+// ---------- Action Required ----------
+
+function computeActionItems() {
+  return state.contracts
+    .filter((c) => c.status === 'active')
+    .map((c) => {
+      const issues = [];
+      if (!c.value_type) issues.push('Unclassified value');
+      if (!c.category_id) issues.push('Uncategorized');
+      if (c.renewal_deadline && daysUntil(c.renewal_deadline) < 0) issues.push('Past deadline');
+      return { ...c, issues };
+    })
+    .filter((c) => c.issues.length > 0)
+    .sort((a, b) => b.issues.length - a.issues.length);
+}
+
+function updateActionBadge() {
+  const count = computeActionItems().length;
+  const badge = $('#nav-action-count');
+  badge.textContent = count;
+  badge.classList.toggle('hidden', count === 0);
+}
+
+function renderActionRequired() {
+  const canEdit = state.role === 'admin' || state.role === 'editor';
+  const items = computeActionItems();
+  $('#action-required-empty').classList.toggle('hidden', items.length > 0);
+  $('#action-required-body').innerHTML = items.map((c) => `
+    <tr>
+      <td>${esc(c.contract_ref)}</td>
+      <td>${esc(c.supplier || '—')}</td>
+      <td>${money(c.total_value)}</td>
+      <td>${fmtDate(c.renewal_deadline)}</td>
+      <td>${c.issues.map((i) => `<span class="badge badge-orange">${esc(i)}</span>`).join(' ')}</td>
+      <td>${canEdit ? `<button class="btn btn-secondary" data-edit="${c.id}">Edit</button>` : ''}</td>
+    </tr>
+  `).join('');
+  $all('#action-required-body [data-edit]').forEach((btn) => btn.onclick = () => openContractModal(btn.dataset.edit));
 }
 
 // ---------- Contracts ----------
@@ -567,6 +622,7 @@ async function saveContractFromModal() {
     closeContractModal();
     state.contracts = await dbFetchContracts();
     renderContracts();
+    updateActionBadge();
   } catch (e) {
     toast('Save failed: ' + e.message, true);
   }
@@ -579,6 +635,7 @@ async function deleteContract(id) {
     await dbDeleteContract(id);
     state.contracts = state.contracts.filter((x) => x.id !== id);
     renderContracts();
+    updateActionBadge();
     toast('Contract deleted');
   } catch (e) {
     toast('Delete failed: ' + e.message, true);
@@ -646,6 +703,7 @@ async function confirmImport() {
   $('#confirm-import-btn').disabled = false;
   state.contracts = await dbFetchContracts();
   state.owners = await dbFetchOwners();
+  updateActionBadge();
   toast(`Import complete: ${ok} contracts`);
 }
 
@@ -785,6 +843,7 @@ async function removeCategory(id) {
     populateCategoryDropdowns();
     renderAccess();
     state.contracts = await dbFetchContracts();
+    updateActionBadge();
   } catch (e) {
     toast('Failed: ' + e.message, true);
   }
