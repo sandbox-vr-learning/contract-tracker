@@ -86,10 +86,12 @@ async function sendEmail(contract, message, recipients) {
 }
 
 async function main() {
+  // "Pending" means the contract is live and being paid for — a renewal decision is pending,
+  // not the contract itself — so it still needs renewal alerts.
   const { data: contracts, error: contractsError } = await supabase
     .from('contracts')
     .select('*, contract_owners(owners(name,email))')
-    .eq('status', 'active');
+    .in('status', ['active', 'pending']);
   if (contractsError) throw contractsError;
 
   const { data: thresholds, error: thresholdsError } = await supabase

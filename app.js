@@ -77,6 +77,12 @@ function relevantDeadline(contract) {
   return d.toISOString().slice(0, 10);
 }
 
+// "Pending" means the contract is live and being paid for — a renewal decision is pending, not the
+// contract itself. It counts as active everywhere except its own status badge and Action Required.
+function isActive(c) {
+  return c.status === 'active' || c.status === 'pending';
+}
+
 // Prefers Vendr's own precomputed annualized figure (accounts for exact billing frequency);
 // falls back to the manual value_type classification for contracts not sourced from a Vendr export.
 function annualizedValue(c) {
@@ -306,7 +312,7 @@ function navigate(view) {
 // ---------- Dashboard ----------
 
 function renderDashboard() {
-  const active = state.contracts.filter((c) => c.status === 'active');
+  const active = state.contracts.filter(isActive);
   const totalValue = active.reduce((sum, c) => sum + annualizedValue(c), 0);
   const totalSavings = state.contracts.reduce((sum, c) => sum + (Number(c.negotiated_savings) || 0), 0);
 
@@ -442,7 +448,7 @@ function renderUpcomingRenewals(withDeadline) {
 
 function computeActionItems() {
   return state.contracts
-    .filter((c) => c.status === 'active')
+    .filter(isActive)
     .map((c) => {
       const issues = [];
       if (!hasKnownAnnualValue(c)) issues.push('Unclassified value');
@@ -450,6 +456,7 @@ function computeActionItems() {
       if (c.renewal_deadline && daysUntil(c.renewal_deadline) < 0) issues.push('Past deadline');
       // Month-to-month subscriptions legitimately have no fixed deadline — only flag this for actual contracts.
       if (!c.renewal_deadline && c.type === 'Contract') issues.push('Missing deadline');
+      if (c.status === 'pending') issues.push('Renewal decision pending');
       return { ...c, issues };
     })
     .filter((c) => c.issues.length > 0)
