@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Contract Tracker</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ---------- Login screen ---------- -->
+<div id="login-screen" class="login-screen hidden">
+  <div class="login-box">
+    <div class="logo">Sandbox<span>VR</span> Contract Tracker</div>
+    <p class="muted" id="login-status">Enter your Sandbox VR email to sign in.</p>
+    <div class="field" style="text-align:left; margin-top:16px;">
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" placeholder="you@sandboxvr.com" />
+    </div>
+    <button class="btn btn-primary" id="login-submit" style="width:100%; justify-content:center;">Send magic link</button>
+  </div>
+</div>
+
+<!-- ---------- No access screen ---------- -->
+<div id="no-access-screen" class="login-screen hidden">
+  <div class="login-box">
+    <div class="logo">Sandbox<span>VR</span> Contract Tracker</div>
+    <p class="muted">Your account (<span id="no-access-email"></span>) doesn't have access yet. Ask an admin to add you.</p>
+    <button class="btn btn-secondary" id="no-access-signout" style="width:100%; justify-content:center; margin-top:12px;">Sign out</button>
+  </div>
+</div>
+
+<!-- ---------- App shell ---------- -->
+<div id="app-shell" class="app-shell hidden">
+  <div class="sidebar">
+    <div class="sidebar-logo">Sandbox<span>VR</span><br/>Contract Tracker</div>
+    <a class="nav-item" data-view="dashboard">Dashboard</a>
+    <a class="nav-item" data-view="contracts">Contracts</a>
+    <a class="nav-item" data-view="import">Import CSV</a>
+    <a class="nav-item hidden" id="nav-access" data-view="access">Access Control</a>
+    <div class="sidebar-footer">
+      <div id="current-user-email"></div>
+      <button id="signout-btn">Sign out</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ---------- Dashboard ---------- -->
+    <div id="view-dashboard" class="view">
+      <div class="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Contract portfolio overview</p>
+        </div>
+        <button class="btn btn-secondary" id="export-csv-btn">Export CSV</button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="label">Total annualized value</div>
+          <div class="value accent" id="stat-total-value">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Active contracts</div>
+          <div class="value" id="stat-active-count">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Renewing in 30 days</div>
+          <div class="value" id="stat-30">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Renewing in 90 days</div>
+          <div class="value" id="stat-90">0</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Biggest upcoming renewals</h2>
+        <div id="biggest-renewals"></div>
+      </div>
+
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:14px;">
+          <h2 style="margin:0;">Upcoming renewals</h2>
+          <div class="flex gap-8">
+            <select id="renewal-window">
+              <option value="30">Next 30 days</option>
+              <option value="60">Next 60 days</option>
+              <option value="90" selected>Next 90 days</option>
+            </select>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Contract</th>
+              <th>Supplier</th>
+              <th>Value</th>
+              <th>Relevant deadline</th>
+              <th>Owners</th>
+            </tr>
+          </thead>
+          <tbody id="upcoming-renewals-body"></tbody>
+        </table>
+        <p class="muted hidden" id="upcoming-empty">No renewals in this window.</p>
+      </div>
+    </div>
+
+    <!-- ---------- Contracts ---------- -->
+    <div id="view-contracts" class="view hidden">
+      <div class="page-header">
+        <div>
+          <h1>Contracts</h1>
+          <p>Click Edit on any row to update it. Changes save immediately.</p>
+        </div>
+        <div class="flex gap-8">
+          <input type="text" id="contracts-search" placeholder="Search supplier or ref…" />
+          <button class="btn btn-primary" id="add-contract-btn">+ Add contract</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Ref</th>
+              <th>Supplier</th>
+              <th>Total value</th>
+              <th>Renewal deadline</th>
+              <th>Notice (days)</th>
+              <th>Auto-renew</th>
+              <th>Stage</th>
+              <th>Status</th>
+              <th>Owners</th>
+              <th>Savings</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="contracts-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---------- Import ---------- -->
+    <div id="view-import" class="view hidden">
+      <div class="page-header">
+        <div>
+          <h1>Import CSV</h1>
+          <p>Upload the Vendr export. Expected headers: Name, Renewal deadline, Supplier, Total value, Auto-renew, Renewal stage, Owners, Negotiated savings, Negotiated savings %.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="field">
+          <label for="csv-file">CSV file</label>
+          <input type="file" id="csv-file" accept=".csv" />
+        </div>
+        <button class="btn btn-primary" id="parse-csv-btn" disabled>Parse file</button>
+        <p class="muted" id="import-status"></p>
+      </div>
+
+      <div class="card hidden" id="import-preview-card">
+        <h2>Preview (<span id="import-count">0</span> rows)</h2>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Ref</th><th>Supplier</th><th>Value</th><th>Deadline</th><th>Auto-renew</th><th>Stage</th><th>Owners</th>
+              </tr>
+            </thead>
+            <tbody id="import-preview-body"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-primary" id="confirm-import-btn" style="margin-top:16px;">Import these contracts</button>
+      </div>
+    </div>
+
+    <!-- ---------- Access Control ---------- -->
+    <div id="view-access" class="view hidden">
+      <div class="page-header">
+        <div>
+          <h1>Access Control</h1>
+          <p>Manage who can view or edit contracts. Admin only.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Add / update a person</h2>
+        <div class="flex gap-12" style="align-items:flex-end;">
+          <div class="field" style="margin:0;">
+            <label for="access-email">Email</label>
+            <input type="email" id="access-email" placeholder="name@sandboxvr.com" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label for="access-role">Role</label>
+            <select id="access-role">
+              <option value="viewer">Viewer</option>
+              <option value="editor">Editor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="access-save-btn">Save</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Current access</h2>
+        <table>
+          <thead><tr><th>Email</th><th>Role</th><th></th></tr></thead>
+          <tbody id="access-body"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Alert timing</h2>
+        <p class="muted">Days before the relevant deadline to send Slack + email notices.</p>
+        <table>
+          <thead><tr><th>Days before</th><th>Enabled</th><th></th></tr></thead>
+          <tbody id="thresholds-body"></tbody>
+        </table>
+        <div class="flex gap-8" style="margin-top:12px;">
+          <input type="number" id="new-threshold-days" placeholder="e.g. 30" style="width:120px;" />
+          <button class="btn btn-secondary" id="add-threshold-btn">+ Add threshold</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ---------- Add/Edit contract modal ---------- -->
+<div id="contract-modal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2 id="contract-modal-title">Add contract</h2>
+    <div class="field">
+      <label for="cm-ref">Contract ref</label>
+      <input type="text" id="cm-ref" placeholder="C-000" />
+    </div>
+    <div class="field">
+      <label for="cm-supplier">Supplier</label>
+      <input type="text" id="cm-supplier" />
+    </div>
+    <div class="field">
+      <label for="cm-value">Total value ($)</label>
+      <input type="number" id="cm-value" />
+    </div>
+    <div class="field">
+      <label for="cm-deadline">Renewal deadline</label>
+      <input type="date" id="cm-deadline" />
+    </div>
+    <div class="field">
+      <label for="cm-notice">Notice period (days)</label>
+      <input type="number" id="cm-notice" />
+    </div>
+    <div class="field">
+      <label for="cm-autorenew">Auto-renew</label>
+      <select id="cm-autorenew">
+        <option value="true">Yes</option>
+        <option value="false">No</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="cm-stage">Renewal stage</label>
+      <input type="text" id="cm-stage" value="Not started" />
+    </div>
+    <div class="field">
+      <label for="cm-status">Status</label>
+      <select id="cm-status">
+        <option value="active">Active</option>
+        <option value="cancelled">Cancelled</option>
+        <option value="expired">Expired</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="cm-owners">Owners (Name &lt;email@sandboxvr.com&gt;, comma-separated)</label>
+      <textarea id="cm-owners" rows="2" placeholder="Jane Doe <jane.doe@sandboxvr.com>, it <it@sandboxvr.com>"></textarea>
+    </div>
+    <div class="field">
+      <label for="cm-savings">Negotiated savings ($)</label>
+      <input type="number" id="cm-savings" />
+    </div>
+    <div class="field">
+      <label for="cm-savings-pct">Negotiated savings (%)</label>
+      <input type="number" id="cm-savings-pct" />
+    </div>
+    <div class="field">
+      <label for="cm-notes">Notes</label>
+      <textarea id="cm-notes" rows="2"></textarea>
+    </div>
+    <div class="flex gap-8" style="justify-content:flex-end; margin-top:16px;">
+      <button class="btn btn-secondary" id="cm-cancel">Cancel</button>
+      <button class="btn btn-primary" id="cm-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
