@@ -236,3 +236,12 @@ export async function dbGetFileSignedUrl(storagePath) {
   if (error) throw error;
   return data.signedUrl;
 }
+
+// Same signed URL, but with Content-Disposition set so the browser saves it instead of previewing it.
+export async function dbGetFileDownloadUrl(storagePath, fileName) {
+  const { data, error } = await supabase.storage
+    .from('contract-files')
+    .createSignedUrl(storagePath, 300, { download: fileName });
+  if (error) throw error;
+  return data.signedUrl;
+}

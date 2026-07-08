@@ -5,7 +5,7 @@ import {
   dbFetchCategories, dbUpsertCategory, dbDeleteCategory,
   dbFetchAlertThresholds, dbUpsertAlertThreshold, dbDeleteAlertThreshold,
   dbFetchUserRoles, dbUpsertUserRole, dbDeleteUserRole,
-  dbFetchContractFiles, dbUploadContractFile, dbDeleteContractFile, dbGetFileSignedUrl,
+  dbFetchContractFiles, dbUploadContractFile, dbDeleteContractFile, dbGetFileSignedUrl, dbGetFileDownloadUrl,
 } from './db.js';
 
 const state = {
@@ -21,7 +21,7 @@ const state = {
   editingContractId: null,
   modalOwners: [],
   sort: { field: 'renewal_deadline', dir: 'asc' },
-  hiddenColumns: new Set(JSON.parse(localStorage.getItem('contractsHiddenColumns') || '[]')),
+  hiddenColumns: new Set(JSON.parse(localStorage.getItem('contractsHiddenColumns') || '["savings"]')),
   detailContractId: null,
   detailFiles: [],
 };
@@ -573,7 +573,7 @@ function renderContracts() {
       <td class="muted">${esc(c.notes || '')}</td>
       <td>
         ${canEdit ? `
-          <button class="btn btn-secondary" data-edit="${c.id}">Edit</button>
+          <button class="btn btn-primary" data-edit="${c.id}">Edit</button>
           <button class="btn btn-danger" data-delete="${c.id}">Delete</button>
         ` : ''}
       </td>
@@ -683,12 +683,14 @@ function renderDetailFiles() {
       </div>
       <div class="flex gap-8">
         <button class="btn btn-secondary" data-view-file="${f.id}">View</button>
+        <button class="btn btn-secondary" data-download-file="${f.id}">Download</button>
         ${canEdit ? `<button class="btn btn-danger" data-delete-file="${f.id}">Delete</button>` : ''}
       </div>
     </div>
   `).join('');
 
   $all('[data-view-file]').forEach((btn) => btn.onclick = () => viewFile(btn.dataset.viewFile));
+  $all('[data-download-file]').forEach((btn) => btn.onclick = () => downloadFile(btn.dataset.downloadFile));
   $all('[data-delete-file]').forEach((btn) => btn.onclick = () => deleteFile(btn.dataset.deleteFile));
 }
 
@@ -700,6 +702,20 @@ async function viewFile(fileId) {
     window.open(url, '_blank');
   } catch (e) {
     toast('Failed to open file: ' + e.message, true);
+  }
+}
+
+async function downloadFile(fileId) {
+  const f = state.detailFiles.find((x) => x.id === fileId);
+  if (!f) return;
+  try {
+    const url = await dbGetFileDownloadUrl(f.storage_path, f.file_name);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = f.file_name;
+    a.click();
+  } catch (e) {
+    toast('Failed to download file: ' + e.message, true);
   }
 }
 
@@ -1122,6 +1138,7 @@ function bindStaticEvents() {
   $all('.nav-item[data-view]').forEach((n) => n.onclick = () => navigate(n.dataset.view));
 
   $('#export-csv-btn').onclick = exportCSV;
+  $('#export-csv-btn-contracts').onclick = exportCSV;
   $('#contracts-search').oninput = renderContracts;
   $('#filter-status').onchange = renderContracts;
   $('#filter-category').onchange = renderContracts;
