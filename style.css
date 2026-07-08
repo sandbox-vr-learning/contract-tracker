@@ -221,6 +221,12 @@ td {
 tr:last-child td { border-bottom: none; }
 tr:hover td { background: var(--crystal-grey); }
 
+#contracts-table td:first-child,
+#contracts-table th:first-child {
+  white-space: nowrap;
+  min-width: 90px;
+}
+
 td[contenteditable="true"] {
   cursor: text;
   border-radius: 4px;
