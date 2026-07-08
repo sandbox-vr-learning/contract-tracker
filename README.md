@@ -2,7 +2,8 @@
 
 Internal Sandbox VR replacement for Vendr — contract database, reporting, and renewal alerting.
 
-**Live app:** https://prismo1020.github.io/contract-tracker/
+**Live app:** https://sandbox-vr-learning.github.io/contract-tracker/
+**Repo:** https://github.com/sandbox-vr-learning/contract-tracker
 
 ## Stack
 - Frontend: vanilla HTML/CSS/JS, no build step, hosted on GitHub Pages.
