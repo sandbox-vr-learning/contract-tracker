@@ -169,6 +169,10 @@
           <select id="filter-category">
             <option value="">All categories</option>
           </select>
+          <div style="position:relative;">
+            <button class="btn btn-secondary" id="columns-btn">Columns ▾</button>
+            <div id="columns-menu" class="owner-suggestions hidden" style="left:auto; right:0; width:210px; padding:10px 14px;"></div>
+          </div>
           <button class="btn btn-primary" id="add-contract-btn">+ Add contract</button>
         </div>
       </div>
@@ -183,13 +187,13 @@
               <th data-sort="category_name" class="sortable">Category</th>
               <th data-sort="total_value" class="sortable">Total value</th>
               <th data-sort="renewal_deadline" class="sortable">Renewal deadline</th>
-              <th>Notice (days)</th>
-              <th>Auto-renew</th>
+              <th data-sort="notice_period_days" class="sortable">Notice (days)</th>
+              <th data-sort="auto_renew" class="sortable">Auto-renew</th>
               <th data-sort="renewal_stage" class="sortable">Stage</th>
               <th data-sort="status" class="sortable">Status</th>
               <th>Owners</th>
-              <th>Value type</th>
-              <th>Savings</th>
+              <th data-sort="annualized_value" class="sortable">Value type</th>
+              <th data-sort="negotiated_savings" class="sortable">Savings</th>
               <th>Notes</th>
               <th></th>
             </tr>

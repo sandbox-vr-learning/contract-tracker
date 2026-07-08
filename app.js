@@ -20,7 +20,24 @@ const state = {
   editingContractId: null,
   modalOwners: [],
   sort: { field: 'renewal_deadline', dir: 'asc' },
+  hiddenColumns: new Set(JSON.parse(localStorage.getItem('contractsHiddenColumns') || '[]')),
 };
+
+// Column index matches th position in the Contracts table (1-based). Ref (1) and Actions (last) are always shown.
+const COLUMN_DEFS = [
+  { key: 'supplier', label: 'Supplier', index: 2 },
+  { key: 'category', label: 'Category', index: 3 },
+  { key: 'value', label: 'Total value', index: 4 },
+  { key: 'deadline', label: 'Renewal deadline', index: 5 },
+  { key: 'notice', label: 'Notice (days)', index: 6 },
+  { key: 'autorenew', label: 'Auto-renew', index: 7 },
+  { key: 'stage', label: 'Stage', index: 8 },
+  { key: 'status', label: 'Status', index: 9 },
+  { key: 'owners', label: 'Owners', index: 10 },
+  { key: 'valuetype', label: 'Value type', index: 11 },
+  { key: 'savings', label: 'Savings', index: 12 },
+  { key: 'notes', label: 'Notes', index: 13 },
+];
 
 const MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
 
@@ -461,13 +478,15 @@ function renderActionRequired() {
 
 // ---------- Contracts ----------
 
+const NUMERIC_SORT_FIELDS = ['total_value', 'notice_period_days', 'negotiated_savings', 'annualized_value'];
+
 function sortContracts(rows) {
   const { field, dir } = state.sort;
   const mult = dir === 'asc' ? 1 : -1;
   return [...rows].sort((a, b) => {
-    let av = a[field];
-    let bv = b[field];
-    if (field === 'total_value') { av = Number(av) || 0; bv = Number(bv) || 0; }
+    let av = field === 'annualized_value' ? annualizedValue(a) : a[field];
+    let bv = field === 'annualized_value' ? annualizedValue(b) : b[field];
+    if (NUMERIC_SORT_FIELDS.includes(field)) { av = Number(av) || 0; bv = Number(bv) || 0; }
     if (av === null || av === undefined) av = '';
     if (bv === null || bv === undefined) bv = '';
     if (av < bv) return -1 * mult;
@@ -485,6 +504,28 @@ function renderSortArrows() {
       arrow.textContent = state.sort.dir === 'asc' ? '↑' : '↓';
       th.appendChild(arrow);
     }
+  });
+}
+
+function applyColumnVisibility() {
+  const table = $('#contracts-table');
+  COLUMN_DEFS.forEach((col) => {
+    table.classList.toggle(`hide-col-${col.index}`, state.hiddenColumns.has(col.key));
+  });
+}
+
+function renderColumnsMenu() {
+  $('#columns-menu').innerHTML = COLUMN_DEFS.map((col) => `
+    <label>
+      <input type="checkbox" data-col-toggle="${col.key}" ${state.hiddenColumns.has(col.key) ? '' : 'checked'} />
+      ${esc(col.label)}
+    </label>
+  `).join('');
+  $all('[data-col-toggle]').forEach((cb) => cb.onchange = () => {
+    if (cb.checked) state.hiddenColumns.delete(cb.dataset.colToggle);
+    else state.hiddenColumns.add(cb.dataset.colToggle);
+    localStorage.setItem('contractsHiddenColumns', JSON.stringify([...state.hiddenColumns]));
+    applyColumnVisibility();
   });
 }
 
@@ -531,6 +572,7 @@ function renderContracts() {
   $all('[data-edit]').forEach((btn) => btn.onclick = () => openContractModal(btn.dataset.edit));
   $all('[data-delete]').forEach((btn) => btn.onclick = () => deleteContract(btn.dataset.delete));
   renderSortArrows();
+  applyColumnVisibility();
 }
 
 // ---------- Owners picker ----------
@@ -930,6 +972,16 @@ function bindStaticEvents() {
       state.sort = { field: th.dataset.sort, dir: 'asc' };
     }
     renderContracts();
+  });
+
+  $('#columns-btn').onclick = () => {
+    renderColumnsMenu();
+    $('#columns-menu').classList.toggle('hidden');
+  };
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#columns-btn') && !e.target.closest('#columns-menu')) {
+      $('#columns-menu').classList.add('hidden');
+    }
   });
 
   $('#add-contract-btn').onclick = () => openContractModal(null);
