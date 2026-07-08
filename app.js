@@ -1104,7 +1104,9 @@ function bindStaticEvents() {
       await dbSignInWithEmail(email);
       $('#login-status').textContent = 'Check your email for a magic link.';
     } catch (e) {
-      $('#login-status').textContent = 'Error: ' + e.message;
+      const reason = e?.message || e?.error_description || e?.error || e?.name || (e?.status ? `HTTP ${e.status}` : 'Unknown error');
+      $('#login-status').textContent = 'Error: ' + reason;
+      console.error('Sign-in failed:', e);
     }
   };
 
