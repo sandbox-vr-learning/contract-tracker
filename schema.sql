@@ -10,15 +10,17 @@ create table public.categories (
   created_at timestamptz not null default now()
 );
 
+-- Tailored to Sandbox VR's business (VR entertainment venues), not generic spend buckets —
+-- rename/add/remove anytime from Admin > Categories.
 insert into public.categories (name) values
-  ('Software & SaaS'),
-  ('Facilities & Real Estate'),
-  ('Marketing & Advertising'),
-  ('Insurance'),
-  ('Payroll & HR'),
-  ('IT & Hardware'),
-  ('Professional Services'),
-  ('Utilities'),
+  ('VR & Content Development'),
+  ('Venue Operations & Facilities'),
+  ('People, Payroll & Talent'),
+  ('Finance, Legal & Compliance'),
+  ('Marketing & Guest Engagement'),
+  ('IT & Network Infrastructure'),
+  ('Engineering & Product Tools'),
+  ('Business Productivity & AI Tools'),
   ('Other');
 
 -- Contracts
