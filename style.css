@@ -374,8 +374,23 @@ label { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
   text-align: center;
 }
 
-.login-box .logo { font-weight: 700; font-size: 20px; margin-bottom: 20px; }
-.login-box .logo span { color: var(--trigger-blue); }
+.login-box .logo { margin-bottom: 20px; }
+
+.login-logo-img {
+  display: block;
+  width: 200px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.login-logo-subtitle {
+  margin-top: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
 
 /* ---------- Info bubbles ---------- */
 
