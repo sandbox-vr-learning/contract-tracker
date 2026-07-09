@@ -1,5 +1,5 @@
 import {
-  dbGetSession, dbOnAuthStateChange, dbSignInWithEmail, dbSignOut, dbGetCurrentUserRole,
+  dbGetSession, dbOnAuthStateChange, dbSignInWithEmail, dbSignOut, dbGetCurrentUserRole, dbUpdateLastLogin,
   dbFetchContracts, dbUpsertContract, dbDeleteContract,
   dbFetchOwners, dbFindOrCreateOwner, dbSetContractOwners,
   dbFetchCategories, dbUpsertCategory, dbDeleteCategory,
@@ -58,6 +58,14 @@ function fmtDate(d) {
   const date = new Date(d + 'T00:00:00');
   if (isNaN(date)) return '—';
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// For full timestamps (e.g. last_login_at), unlike fmtDate this expects a real ISO datetime, not a bare date.
+function fmtDateTime(iso) {
+  if (!iso) return 'Never';
+  const date = new Date(iso);
+  if (isNaN(date)) return 'Never';
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 function daysUntil(dateStr) {
@@ -254,6 +262,7 @@ async function afterAuthChange() {
   }
   $('#current-user-email').textContent = email + ' (' + state.role + ')';
   $('#nav-access').classList.toggle('hidden', state.role !== 'admin');
+  dbUpdateLastLogin().catch((e) => console.error('Failed to record last login:', e));
   showScreen('app');
   await loadAllData();
   navigate(state.view);
@@ -983,6 +992,7 @@ function renderAccess() {
     <tr>
       <td>${esc(u.email)}</td>
       <td>${esc(u.role)}</td>
+      <td class="muted">${fmtDateTime(u.last_login_at)}</td>
       <td><button class="btn btn-danger" data-remove-role="${u.id}">Remove</button></td>
     </tr>
   `).join('');

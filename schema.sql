@@ -211,3 +211,22 @@ create policy "delete contract files for admin/editor" on storage.objects
   for delete using (
     bucket_id = 'contract-files' and public.current_user_role() in ('admin', 'editor')
   );
+
+-- Last login tracking, shown on Admin > Access Control
+alter table public.user_roles
+  add column last_login_at timestamptz;
+
+-- security definer so a user can update only their own last_login_at,
+-- without needing broad UPDATE access to user_roles (which could let them touch their own role)
+create or replace function public.update_last_login()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.user_roles
+  set last_login_at = now()
+  where email = auth.jwt() ->> 'email';
+$$;
+
+grant execute on function public.update_last_login() to authenticated;

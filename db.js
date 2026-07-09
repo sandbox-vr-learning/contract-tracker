@@ -35,6 +35,11 @@ export async function dbGetCurrentUserRole(email) {
   return data?.role ?? null;
 }
 
+export async function dbUpdateLastLogin() {
+  const { error } = await supabase.rpc('update_last_login');
+  if (error) throw error;
+}
+
 // ---------- Contracts ----------
 
 // Returns contracts with owners nested as [{ id, name, email }] and category_name flattened
