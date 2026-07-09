@@ -298,7 +298,7 @@ function populateCategoryDropdowns() {
 
   const filterSelect = $('#filter-category');
   const filterVal = filterSelect.value;
-  filterSelect.innerHTML = `<option value="">All categories</option>${options}`;
+  filterSelect.innerHTML = `<option value="">All categories</option>${options}<option value="__uncategorized__">Uncategorized</option>`;
   filterSelect.value = filterVal;
 }
 
@@ -400,22 +400,29 @@ function renderPastDeadline(active) {
 }
 
 function renderCategoryChart(active) {
-  const sums = {};
+  const buckets = {}; // key: category_id, or '__uncategorized__'
   active.forEach((c) => {
-    const cat = c.category_name || 'Uncategorized';
-    sums[cat] = (sums[cat] || 0) + (Number(c.total_value) || 0);
+    const key = c.category_id || '__uncategorized__';
+    const name = c.category_name || 'Uncategorized';
+    if (!buckets[key]) buckets[key] = { name, total: 0 };
+    buckets[key].total += Number(c.total_value) || 0;
   });
-  const entries = Object.entries(sums).sort((a, b) => b[1] - a[1]);
-  const max = Math.max(...entries.map((e) => e[1]), 1);
+  const entries = Object.entries(buckets).sort((a, b) => b[1].total - a[1].total);
+  const max = Math.max(...entries.map(([, v]) => v.total), 1);
   $('#category-chart').innerHTML = entries.length
-    ? entries.map(([cat, value]) => `
-        <div class="bar-row">
-          <div>${esc(cat)}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${(value / max * 100).toFixed(0)}%"></div></div>
-          <div class="bar-value">${money(value)}</div>
-        </div>
+    ? entries.map(([key, v]) => `
+        <a href="#" class="bar-row" data-filter-category="${key}">
+          <div>${esc(v.name)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(v.total / max * 100).toFixed(0)}%"></div></div>
+          <div class="bar-value">${money(v.total)}</div>
+        </a>
       `).join('')
     : '<p class="muted">No active contracts yet.</p>';
+  $all('#category-chart [data-filter-category]').forEach((el) => el.onclick = (e) => {
+    e.preventDefault();
+    $('#filter-category').value = el.dataset.filterCategory;
+    navigate('contracts');
+  });
 }
 
 function renderUpcomingRenewals(withDeadline) {
@@ -543,7 +550,8 @@ function renderContracts() {
   let rows = state.contracts.filter((c) => {
     if (search && !(c.contract_ref?.toLowerCase().includes(search) || c.supplier?.toLowerCase().includes(search))) return false;
     if (statusFilter && c.status !== statusFilter) return false;
-    if (categoryFilter && c.category_id !== categoryFilter) return false;
+    if (categoryFilter === '__uncategorized__' && c.category_id) return false;
+    if (categoryFilter && categoryFilter !== '__uncategorized__' && c.category_id !== categoryFilter) return false;
     return true;
   });
   rows = sortContracts(rows);
