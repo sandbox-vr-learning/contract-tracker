@@ -48,14 +48,24 @@ a { color: var(--trigger-blue); }
 
 .sidebar-logo {
   padding: 0 20px 20px;
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 0.02em;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   margin-bottom: 12px;
 }
 
-.sidebar-logo span { color: var(--trigger-blue); }
+.sidebar-logo-img {
+  display: block;
+  width: 160px;
+  height: auto;
+}
+
+.sidebar-logo-subtitle {
+  margin-top: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+}
 
 .nav-item {
   display: block;
