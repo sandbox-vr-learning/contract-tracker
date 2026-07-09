@@ -346,13 +346,14 @@ function renderDashboard() {
   $('#biggest-renewals').innerHTML = biggest.length
     ? biggest.map((c) => `
         <tr>
-          <td>${esc(c.contract_ref)}</td>
+          <td><a href="#" data-view-contract="${c.id}">${esc(c.contract_ref)}</a></td>
           <td>${esc(c.supplier || '—')}</td>
           <td><span class="badge badge-blue">${money(c.total_value)}</span></td>
           <td>${fmtDate(relevantDeadline(c))}</td>
         </tr>
       `).join('')
     : '<tr><td colspan="4" class="muted">No active contracts yet.</td></tr>';
+  bindContractDetailLinks('#biggest-renewals');
 
   renderNeedsReview(active);
   renderAutoRenewRisk(withDeadline);
@@ -425,7 +426,7 @@ function renderUpcomingRenewals(withDeadline) {
     const urgencyClass = c._days <= 30 ? 'urgency-30' : c._days <= 60 ? 'urgency-60' : 'urgency-90';
     return `
       <tr class="${urgencyClass}">
-        <td>${esc(c.contract_ref)}</td>
+        <td><a href="#" data-view-contract="${c.id}">${esc(c.contract_ref)}</a></td>
         <td>${esc(c.supplier || '—')}</td>
         <td>${money(c.total_value)}</td>
         <td>${fmtDate(c._relevant)} <span class="muted">(${c._days}d)</span></td>
@@ -433,6 +434,7 @@ function renderUpcomingRenewals(withDeadline) {
       </tr>
     `;
   }).join('');
+  bindContractDetailLinks('#upcoming-renewals-body');
 }
 
 // ---------- Action Required ----------
@@ -467,7 +469,7 @@ function renderActionRequired() {
   $('#action-required-empty').classList.toggle('hidden', items.length > 0);
   $('#action-required-body').innerHTML = items.map((c) => `
     <tr>
-      <td>${esc(c.contract_ref)}</td>
+      <td><a href="#" data-view-contract="${c.id}">${esc(c.contract_ref)}</a></td>
       <td>${esc(c.supplier || '—')}</td>
       <td>${money(c.total_value)}</td>
       <td>${fmtDate(c.renewal_deadline)}</td>
@@ -476,6 +478,7 @@ function renderActionRequired() {
     </tr>
   `).join('');
   $all('#action-required-body [data-edit]').forEach((btn) => btn.onclick = () => openContractModal(btn.dataset.edit));
+  bindContractDetailLinks('#action-required-body');
 }
 
 // ---------- Contracts ----------
@@ -572,10 +575,7 @@ function renderContracts() {
 
   $all('[data-edit]').forEach((btn) => btn.onclick = () => openContractModal(btn.dataset.edit));
   $all('[data-delete]').forEach((btn) => btn.onclick = () => deleteContract(btn.dataset.delete));
-  $all('[data-view-contract]').forEach((a) => a.onclick = (e) => {
-    e.preventDefault();
-    openContractDetail(a.dataset.viewContract);
-  });
+  bindContractDetailLinks('#contracts-body');
   renderSortArrows();
   applyColumnVisibility();
 }
@@ -599,6 +599,13 @@ function fileIcon(fileType) {
 async function openContractDetail(id) {
   state.detailContractId = id;
   navigate('contract-detail');
+}
+
+function bindContractDetailLinks(containerSelector) {
+  $all(`${containerSelector} [data-view-contract]`).forEach((a) => a.onclick = (e) => {
+    e.preventDefault();
+    openContractDetail(a.dataset.viewContract);
+  });
 }
 
 async function renderContractDetail() {
